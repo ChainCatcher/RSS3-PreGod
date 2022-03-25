@@ -64,3 +64,13 @@ func GetLatestBlockHeight(networkId constants.NetworkID) (int64, error) {
 
 	return int64(blockHeight), nil
 }
+
+func GetLatestBlockHeightWithConfirmations(networkId constants.NetworkID, confirmations int64) (int64, error) {
+	// get latest block height
+	latestBlockHeight, err := GetLatestBlockHeight(networkId)
+	if err != nil {
+		return 0, err
+	}
+
+	return latestBlockHeight - confirmations, nil
+}

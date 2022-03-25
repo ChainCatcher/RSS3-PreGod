@@ -13,38 +13,18 @@ import (
 	"github.com/NaturalSelectionLabs/RSS3-PreGod/shared/pkg/constants"
 )
 
-type Param struct {
-	FromHeight    int64
-	Step          int64
-	MinStep       int64
-	Confirmations int64
-	SleepInterval time.Duration
-	Interrupt     chan os.Signal
-}
-
-func NewParam(from, step, minStep, confirmations, sleepInterval int64) Param {
-	return Param{
-		FromHeight:    from,
-		Step:          step,
-		MinStep:       minStep,
-		Confirmations: confirmations,
-		SleepInterval: time.Duration(sleepInterval),
-		Interrupt:     make(chan os.Signal, 1),
-	}
-}
-
-type gitcoinCrawler struct {
-	eth     Param
-	polygon Param
-	zk      Param
+type crawler struct {
+	eth     crawlerConfig
+	polygon crawlerConfig
+	zk      crawlerConfig
 
 	zksTokensCache       map[int64]zksync.Token
 	inactiveAdminsCache  map[string]bool
 	hostingProjectsCache map[string]ProjectInfo
 }
 
-func NewGitcoinCrawler(ethParam, polygonParam, zkParam Param) *gitcoinCrawler {
-	return &gitcoinCrawler{
+func NewCrawler(ethParam, polygonParam, zkParam crawlerConfig) *crawler {
+	return &crawler{
 		ethParam,
 		polygonParam,
 		zkParam,
@@ -55,7 +35,7 @@ func NewGitcoinCrawler(ethParam, polygonParam, zkParam Param) *gitcoinCrawler {
 }
 
 // UpdateZksToken update Token by tokenId
-func (gc *gitcoinCrawler) UpdateZksToken() error {
+func (gc *crawler) UpdateZksToken() error {
 	tokens, err := zksync.GetTokens()
 	if err != nil {
 		return err
@@ -69,36 +49,36 @@ func (gc *gitcoinCrawler) UpdateZksToken() error {
 }
 
 // GetZksToken returns Token by tokenId
-func (gc *gitcoinCrawler) GetZksToken(id int64) zksync.Token {
+func (gc *crawler) GetZksToken(id int64) zksync.Token {
 	return gc.zksTokensCache[id]
 }
 
 // inactiveAdminAddress checks an admin address is active or not
-func (gc *gitcoinCrawler) inactiveAdminAddress(adminAddress string) bool {
+func (gc *crawler) inactiveAdminAddress(adminAddress string) bool {
 	adminAddress = strings.ToLower(adminAddress)
 
 	return gc.inactiveAdminsCache[adminAddress]
 }
 
 // addInactiveAdminAddress adds an admin address
-func (gc *gitcoinCrawler) addInactiveAdminAddress(adminAddress string) {
+func (gc *crawler) addInactiveAdminAddress(adminAddress string) {
 	adminAddress = strings.ToLower(adminAddress)
 	gc.inactiveAdminsCache[adminAddress] = true
 }
 
-func (gc *gitcoinCrawler) hostingProject(adminAddress string) (ProjectInfo, bool) {
+func (gc *crawler) hostingProject(adminAddress string) (ProjectInfo, bool) {
 	p, ok := gc.hostingProjectsCache[adminAddress]
 
 	return p, ok
 }
 
-func (gc *gitcoinCrawler) needUpdateProject(adminAddress string) bool {
+func (gc *crawler) needUpdateProject(adminAddress string) bool {
 	p, ok := gc.hostingProject(adminAddress)
 
 	return !(ok && p.Active)
 }
 
-func (gc *gitcoinCrawler) updateHostingProject(adminAddress string) (inactive bool, err error) {
+func (gc *crawler) updateHostingProject(adminAddress string) (inactive bool, err error) {
 	project, err := GetProjectsInfo(adminAddress, "")
 	if err != nil {
 		return
@@ -114,7 +94,7 @@ func (gc *gitcoinCrawler) updateHostingProject(adminAddress string) (inactive bo
 	return
 }
 
-func (gc *gitcoinCrawler) zksyncRun() error {
+func (gc *crawler) zksyncRun() error {
 	// token cache
 	if len(gc.zksTokensCache) == 0 {
 		tokens, err := zksync.GetTokens()
@@ -127,24 +107,25 @@ func (gc *gitcoinCrawler) zksyncRun() error {
 		}
 	}
 
-	latestBlockHeight, err := zksync.GetLatestBlockHeight()
+	latestConfirmedBlockHeight, err := zksync.GetLatestBlockHeightWithConfirmations(gc.zk.Confirmations)
 	if err != nil {
 		return err
 	}
 
-	latestConfirmedBlockHeight := latestBlockHeight - gc.zk.Confirmations
-
 	// scan the latest block content periodically
 	endBlockHeight := gc.zk.FromHeight + gc.zk.Step
-	if latestConfirmedBlockHeight <= endBlockHeight {
+	if latestConfirmedBlockHeight < endBlockHeight {
 		time.Sleep(gc.zk.SleepInterval)
 
-		latestBlockHeight, err = zksync.GetLatestBlockHeight()
+		latestConfirmedBlockHeight, err = zksync.GetLatestBlockHeightWithConfirmations(gc.zk.Confirmations)
 		if err != nil {
 			return err
 		}
 
-		endBlockHeight = latestBlockHeight - gc.zk.Confirmations
+		if latestConfirmedBlockHeight < endBlockHeight {
+			return nil
+		}
+
 		gc.zk.Step = gc.zk.MinStep
 	}
 
@@ -162,26 +143,30 @@ func (gc *gitcoinCrawler) zksyncRun() error {
 	return nil
 }
 
-func (gc *gitcoinCrawler) xscanRun(networkId constants.NetworkID) error {
-	var p *Param
+func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
+	var p *crawlerConfig
 	if networkId == constants.NetworkIDEthereumMainnet {
 		p = &gc.eth
 	} else if networkId == constants.NetworkIDPolygon {
 		p = &gc.polygon
 	}
 
-	latestBlockHeight, err := xscan.GetLatestBlockHeight(networkId)
+	latestBlockHeight, err := xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
 	if err != nil {
 		return err
 	}
 
 	endBlockHeight := p.FromHeight + p.Step
-	if latestBlockHeight <= endBlockHeight {
+	if latestBlockHeight < endBlockHeight {
 		time.Sleep(p.SleepInterval)
 
 		latestBlockHeight, err = xscan.GetLatestBlockHeight(networkId)
 		if err != nil {
 			return err
+		}
+
+		if latestBlockHeight < endBlockHeight {
+			return nil
 		}
 
 		endBlockHeight = latestBlockHeight
@@ -238,7 +223,7 @@ func setDB(donations []DonationInfo, networkId constants.NetworkID) {
 	}
 }
 
-func (gc *gitcoinCrawler) ZkStart() error {
+func (gc *crawler) ZkStart() error {
 	signal.Notify(gc.zk.Interrupt, os.Interrupt)
 
 	for {
@@ -247,11 +232,12 @@ func (gc *gitcoinCrawler) ZkStart() error {
 			return nil
 		default:
 			gc.zksyncRun()
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
 
-func (gc *gitcoinCrawler) EthStart() error {
+func (gc *crawler) EthStart() error {
 	signal.Notify(gc.eth.Interrupt, os.Interrupt)
 
 	for {
@@ -260,11 +246,12 @@ func (gc *gitcoinCrawler) EthStart() error {
 			return nil
 		default:
 			gc.xscanRun(constants.NetworkIDEthereumMainnet)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
 
-func (gc *gitcoinCrawler) PolygonStart() error {
+func (gc *crawler) PolygonStart() error {
 	signal.Notify(gc.polygon.Interrupt, os.Interrupt)
 
 	for {
@@ -273,6 +260,7 @@ func (gc *gitcoinCrawler) PolygonStart() error {
 			return nil
 		default:
 			gc.xscanRun(constants.NetworkIDPolygon)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }

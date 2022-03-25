@@ -95,15 +95,11 @@ func main() {
 	srv.Start()
 
 	// arweave crawler
-	ar := arweave.NewArCrawler(arweave.MirrorUploader, arweave.DefaultCrawlConfig)
+	ar := arweave.NewCrawler(arweave.MirrorUploader, arweave.DefaultCrawlConfig)
 	ar.Start()
 
 	// gitcoin crawler
-	ethParam := gitcoin.NewParam(1, 10000, 10, 10, 600)
-	polygonParam := gitcoin.NewParam(1, 10000, 10, 10, 600)
-	zkParam := gitcoin.NewParam(1, 10000, 10, 10, 600)
-	gc := gitcoin.NewGitcoinCrawler(ethParam, polygonParam, zkParam)
-
+	gc := gitcoin.NewCrawler(*gitcoin.DefaultEthConfig, *gitcoin.DefaultPolygonConfig, *gitcoin.DefaultZksyncConfig)
 	go gc.PolygonStart()
 	go gc.EthStart()
 	go gc.ZkStart()
