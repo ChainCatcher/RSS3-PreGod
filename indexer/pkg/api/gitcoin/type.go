@@ -36,7 +36,7 @@ var DefaultEthConfig = &crawlerConfig{
 }
 
 var DefaultPolygonConfig = &crawlerConfig{
-	FromHeight:    22752839,
+	FromHeight:    22013924,
 	Step:          50,
 	MinStep:       10,
 	Confirmations: 120,

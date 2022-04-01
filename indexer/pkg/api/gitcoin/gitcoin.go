@@ -1,6 +1,7 @@
 package gitcoin
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +16,8 @@ import (
 const grantUrl = "https://gitcoin.co/grants/grants.json"
 const grantsApi = "https://gitcoin.co/api/v0.1/grants/"
 const donationSentTopic = "0x3bb7428b25f9bdad9bd2faa4c6a7a9e5d5882657e96c1d24cc41c1d6c1910a98"
-const bulkCheckoutAddress = "0x7d655c57f71464B6f83811C55D84009Cd9f5221C"
+const bulkCheckoutAddressETH = "0x7d655c57f71464B6f83811C55D84009Cd9f5221C"
+const bulkCheckoutAddressPolygon = "0xb99080b9407436eBb2b8Fe56D45fFA47E9bb8877"
 
 type tokenMeta struct {
 	decimal int64
@@ -222,7 +224,16 @@ func (gc *crawler) GetZkSyncDonations(fromBlock, toBlock int64) ([]DonationInfo,
 
 // GetEthDonations returns donations from ethereum and polygon
 func GetEthDonations(fromBlock int64, toBlock int64, chainType ChainType) ([]DonationInfo, error) {
-	logs, err := moralis.GetLogs(fromBlock, toBlock, bulkCheckoutAddress, donationSentTopic, string(chainType), config.Config.Indexer.Moralis.ApiKey)
+	var checkoutAddress string
+	if chainType == ETH {
+		checkoutAddress = bulkCheckoutAddressETH
+	} else if chainType == Polygon {
+		checkoutAddress = bulkCheckoutAddressPolygon
+	} else {
+		return nil, fmt.Errorf("invalid chainType %s", string(chainType))
+	}
+
+	logs, err := moralis.GetLogs(fromBlock, toBlock, checkoutAddress, donationSentTopic, string(chainType), config.Config.Indexer.Moralis.ApiKey)
 
 	if err != nil {
 		return nil, err
