@@ -68,7 +68,7 @@ func (ar *crawler) run() error {
 
 				step = DefaultCrawlStep // reset step to default if we are at the end of the chain
 
-				if latestConfirmedBlockHeight <= endBlockHeight {
+				if latestConfirmedBlockHeight > endBlockHeight {
 					break
 				}
 			}

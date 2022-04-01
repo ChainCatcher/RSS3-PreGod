@@ -153,25 +153,27 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 		p = &gc.polygon
 	}
 
-	latestBlockHeight, err := xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
+	latestConfirmedBlockHeight, err := xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
+	logger.Info("latestConfirmedBlockHeight: ", latestConfirmedBlockHeight)
 	if err != nil {
 		return err
 	}
 
 	endBlockHeight := p.FromHeight + p.Step
-	if latestBlockHeight < endBlockHeight {
-		time.Sleep(p.SleepInterval)
+	if latestConfirmedBlockHeight < endBlockHeight {
+		for {
+			time.Sleep(p.SleepInterval)
 
-		latestBlockHeight, err = xscan.GetLatestBlockHeight(networkId)
-		if err != nil {
-			return err
+			latestConfirmedBlockHeight, err = xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
+			if err != nil {
+				return err
+			}
+
+			if latestConfirmedBlockHeight > endBlockHeight {
+				break
+			}
 		}
 
-		if latestBlockHeight < endBlockHeight {
-			return nil
-		}
-
-		endBlockHeight = latestBlockHeight
 		p.Step = p.MinStep
 	}
 
