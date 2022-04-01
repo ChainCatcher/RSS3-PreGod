@@ -229,6 +229,7 @@ func GetEthDonations(fromBlock int64, toBlock int64, chainType ChainType) ([]Don
 	}
 
 	donations := make([]DonationInfo, 0)
+
 	for _, item := range logs.Result {
 		donor := "0x" + item.Topic3[26:]
 		tokenAddress := "0x" + item.Topic1[26:]

@@ -154,7 +154,6 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 	}
 
 	latestConfirmedBlockHeight, err := xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
-	logger.Info("latestConfirmedBlockHeight: ", latestConfirmedBlockHeight)
 	if err != nil {
 		return err
 	}
