@@ -21,6 +21,7 @@ type crawlConfig struct {
 	fromHeight    int64
 	confirmations int64
 	step          int64
+	minStep       int64
 	sleepInterval time.Duration
 }
 
@@ -46,15 +47,17 @@ func (ar *crawler) run() error {
 	endBlockHeight := startBlockHeight + step
 	tempDelay := ar.cfg.sleepInterval
 
-	latestConfirmedBlockHeight, err := GetLatestBlockHeightWithConfirmations(ar.cfg.confirmations)
-	if err != nil {
-		return err
-	}
-
 	for {
 		// handle interrupt
 		if ar.gotInterrupt() {
 			return ErrInterrupt
+		}
+
+		latestConfirmedBlockHeight, err := GetLatestBlockHeightWithConfirmations(ar.cfg.confirmations)
+		if err != nil {
+			logger.Errorf("get latest block error: %v", err)
+
+			return err
 		}
 
 		if latestConfirmedBlockHeight <= endBlockHeight {
@@ -63,17 +66,18 @@ func (ar *crawler) run() error {
 
 				latestConfirmedBlockHeight, err = GetLatestBlockHeightWithConfirmations(ar.cfg.confirmations)
 				if err != nil {
+					logger.Errorf("get latest block error: %v", err)
+
 					return err
 				}
-
-				step = DefaultCrawlStep // reset step to default if we are at the end of the chain
 
 				if latestConfirmedBlockHeight > endBlockHeight {
 					break
 				}
 			}
-		} else {
-			step = ar.cfg.step
+
+			// use minStep if we are at the end of the chain
+			step = ar.cfg.minStep
 		}
 
 		log.Println("Getting articles from", startBlockHeight, "to", endBlockHeight,
@@ -83,8 +87,8 @@ func (ar *crawler) run() error {
 
 		ar.parseMirrorArticles(startBlockHeight, endBlockHeight, ar.identity)
 
-		startBlockHeight = startBlockHeight + step
-		endBlockHeight = endBlockHeight + step
+		startBlockHeight = endBlockHeight
+		endBlockHeight = startBlockHeight + step
 	}
 }
 
@@ -93,6 +97,8 @@ func (ar *crawler) run() error {
 func (ar *crawler) parseMirrorArticles(from, to int64, owner ArAccount) error {
 	articles, err := GetMirrorContents(from, to, owner)
 	if err != nil {
+		logger.Errorf("GetMirrorContents error: [%v]", err)
+
 		return err
 	}
 
@@ -112,10 +118,12 @@ func (ar *crawler) parseMirrorArticles(from, to int64, owner ArAccount) error {
 		author, err := rss3uri.NewInstance("account", article.Author, string(constants.PlatformSymbolEthereum))
 		if err != nil {
 			//TODO: may send to a error queue or whatever in the future
-			logger.Error(err)
+			logger.Errorf("arweave NewInstance error: [%v]", err)
 
 			tsp = time.Now()
 		}
+
+		logger.Infof("author: [%v]", author)
 
 		ni := model.NewItem(
 			constants.NetworkIDArweaveMainnet,

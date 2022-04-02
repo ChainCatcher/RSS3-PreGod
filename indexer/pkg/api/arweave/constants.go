@@ -9,8 +9,8 @@ const (
 )
 
 const (
-	DefaultCrawlStep     = 50
-	DefaultFromHeight    = 1
+	DefaultCrawlStep     = 100
+	DefaultFromHeight    = 591647
 	DefaultConfirmations = 10
 	DefaultCrawlMinStep  = 10
 )

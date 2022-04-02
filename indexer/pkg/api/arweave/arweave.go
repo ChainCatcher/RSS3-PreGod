@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/NaturalSelectionLabs/RSS3-PreGod/shared/pkg/httpx"
+	"github.com/NaturalSelectionLabs/RSS3-PreGod/shared/pkg/logger"
 	"github.com/valyala/fastjson"
 )
 
@@ -74,13 +75,19 @@ func GetTransactions(from, to int64, owner ArAccount) ([]byte, error) {
 func GetMirrorContents(from, to int64, owner ArAccount) ([]MirrorContent, error) {
 	response, err := GetTransactions(from, to, owner)
 	if err != nil {
+		logger.Errorf("GetTransactions error: [%v]", err)
+
 		return nil, nil
 	}
+
+	//log.Println(string(response))
 
 	var parser fastjson.Parser
 
 	parsedJson, parseErr := parser.Parse(string(response))
 	if parseErr != nil {
+		logger.Errorf("Parse json  error: [%v]", parseErr)
+
 		return nil, nil
 	}
 
@@ -121,16 +128,18 @@ func parseGraphqlNode(node string) (MirrorContent, error) {
 		case "Original-Content-Digest":
 			article.OriginalDigest = value
 		}
-
-		article.Link = mirrorHost + "/" + article.Author + "/" + article.OriginalDigest
 	}
 
 	id := parsedJson.GetStringBytes("node", "id")
 	content, err := GetContentByTxHash(string(id))
 
 	if err != nil {
+		logger.Errorf("GetContentByTxHash error: [%v]", err)
+
 		return article, err
 	}
+
+	//log.Println(string(content))
 
 	parsedJson, err = parser.Parse(string(content))
 	if err != nil {
@@ -145,6 +154,24 @@ func parseGraphqlNode(node string) (MirrorContent, error) {
 	article.Content = string(parsedJson.GetStringBytes("content", "body")) // timestamp
 	// txHash
 	article.TxHash = string(id)
+
+	// parse digest and author, in case of empty fields in tags, eg: arweave block #591647
+	// Author
+	if article.Author == "" {
+		article.Author = string(parsedJson.GetStringBytes("authorship", "contributor"))
+	}
+	// parse Content-Digest
+	if article.Digest == "" {
+		article.Digest = string(parsedJson.GetStringBytes("digest"))
+	}
+	// parse OriginalDigest
+	if article.OriginalDigest == "" {
+		article.OriginalDigest = string(parsedJson.GetStringBytes("originalDigest"))
+	}
+	// Link
+	if article.Author != "" && article.OriginalDigest != "" {
+		article.Link = mirrorHost + "/" + article.Author + "/" + article.OriginalDigest
+	}
 
 	return article, nil
 }
