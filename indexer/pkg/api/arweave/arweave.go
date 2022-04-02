@@ -117,6 +117,12 @@ func parseGraphqlNode(node string) (MirrorContent, error) {
 
 	tags := parsedJson.GetArray("node", "tags")
 	for _, tag := range tags {
+		// only parse tags with "MirrorXYZ"
+		appName := string(tag.GetStringBytes("App-Name"))
+		if appName != "MirrorXYZ" {
+			continue
+		}
+
 		name := string(tag.GetStringBytes("name"))
 		value := string(tag.GetStringBytes("value"))
 
