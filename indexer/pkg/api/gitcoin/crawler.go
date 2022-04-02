@@ -40,6 +40,8 @@ func NewCrawler(ethParam, polygonParam, zkParam crawlerConfig) *crawler {
 func (gc *crawler) UpdateZksToken() error {
 	tokens, err := zksync.GetTokens()
 	if err != nil {
+		logger.Errorf("zksync get tokens error: %v", err)
+
 		return err
 	}
 
@@ -83,6 +85,8 @@ func (gc *crawler) needUpdateProject(adminAddress string) bool {
 func (gc *crawler) updateHostingProject(adminAddress string) (inactive bool, err error) {
 	project, err := GetProjectsInfo(adminAddress, "")
 	if err != nil {
+		logger.Errorf("zksync get projects info error: %v", err)
+
 		return
 	}
 
@@ -97,10 +101,14 @@ func (gc *crawler) updateHostingProject(adminAddress string) (inactive bool, err
 }
 
 func (gc *crawler) zksyncRun() error {
+	logger.Info("Starting run zksync")
+
 	// token cache
 	if len(gc.zksTokensCache) == 0 {
 		tokens, err := zksync.GetTokens()
 		if err != nil {
+			logger.Errorf("zksync get tokens error: %v", err)
+
 			return err
 		}
 
@@ -111,6 +119,8 @@ func (gc *crawler) zksyncRun() error {
 
 	latestConfirmedBlockHeight, err := zksync.GetLatestBlockHeightWithConfirmations(gc.zk.Confirmations)
 	if err != nil {
+		logger.Errorf("zksync get latest block error: %v", err)
+
 		return err
 	}
 
@@ -121,6 +131,8 @@ func (gc *crawler) zksyncRun() error {
 
 		latestConfirmedBlockHeight, err = zksync.GetLatestBlockHeightWithConfirmations(gc.zk.Confirmations)
 		if err != nil {
+			logger.Errorf("zksync get latest block error: %v", err)
+
 			return err
 		}
 
@@ -128,12 +140,15 @@ func (gc *crawler) zksyncRun() error {
 			return nil
 		}
 
+		// use minStep when catching up with the latest block height
 		gc.zk.Step = gc.zk.MinStep
 	}
 
 	// get zksync donations
 	donations, err := gc.GetZkSyncDonations(gc.zk.FromHeight, endBlockHeight)
 	if err != nil {
+		logger.Errorf("zksync get donations error: %v", err)
+
 		return err
 	}
 
@@ -155,6 +170,8 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 
 	latestConfirmedBlockHeight, err := xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
 	if err != nil {
+		logger.Errorf("xscan get latest block error: %v", err)
+
 		return err
 	}
 
@@ -165,6 +182,8 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 
 			latestConfirmedBlockHeight, err = xscan.GetLatestBlockHeightWithConfirmations(networkId, p.Confirmations)
 			if err != nil {
+				logger.Errorf("xscan get latest block error: %v", err)
+
 				return err
 			}
 
@@ -173,6 +192,7 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 			}
 		}
 
+		// use minStep when catching up with the latest block height
 		p.Step = p.MinStep
 	}
 
@@ -185,6 +205,8 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 
 	donations, err := GetEthDonations(p.FromHeight, endBlockHeight, chainType)
 	if err != nil {
+		logger.Errorf("[%s] get donations error: %v", networkId.Symbol(), err)
+
 		return err
 	}
 
@@ -197,6 +219,8 @@ func (gc *crawler) xscanRun(networkId constants.NetworkID) error {
 }
 
 func setDB(donations []DonationInfo, networkId constants.NetworkID) {
+	logger.Infof("set db, network: [%s]", networkId.Symbol())
+
 	items := make([]*model.Item, 0)
 
 	for _, v := range donations {
@@ -204,13 +228,15 @@ func setDB(donations []DonationInfo, networkId constants.NetworkID) {
 		author, err := rss3uri.NewInstance("account", v.Donor, string(constants.PlatformSymbolEthereum))
 
 		if err != nil {
-			logger.Errorf("gitcoin [%s] get new instance error:", err)
+			logger.Errorf("gitcoin setDB get new instance error: %v", err)
 
 			return
 		}
 
 		tsp, err := time.Parse(time.RFC3339, v.Timestamp)
 		if err != nil {
+			logger.Errorf("gitcoin parse time error: %v", err)
+
 			tsp = time.Now()
 		}
 
@@ -246,6 +272,7 @@ func setDB(donations []DonationInfo, networkId constants.NetworkID) {
 }
 
 func (gc *crawler) ZkStart() error {
+	logger.Info("Start crawling gitcoin zksync")
 	signal.Notify(gc.zk.Interrupt, os.Interrupt)
 
 	for {
@@ -260,6 +287,7 @@ func (gc *crawler) ZkStart() error {
 }
 
 func (gc *crawler) EthStart() error {
+	logger.Info("Start crawling gitcoin eth")
 	signal.Notify(gc.eth.Interrupt, os.Interrupt)
 
 	for {
@@ -274,6 +302,7 @@ func (gc *crawler) EthStart() error {
 }
 
 func (gc *crawler) PolygonStart() error {
+	logger.Info("Start crawling gitcoin polygon")
 	signal.Notify(gc.polygon.Interrupt, os.Interrupt)
 
 	for {

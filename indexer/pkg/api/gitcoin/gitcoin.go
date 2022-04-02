@@ -127,6 +127,8 @@ func GetProjectsInfo(adminAddress string, title string) (ProjectInfo, error) {
 	content, err := httpx.Get(url, headers)
 
 	if err != nil {
+		logger.Errorf("gitcoin get project info error: [%v]", err)
+
 		return project, err
 	}
 
@@ -134,6 +136,8 @@ func GetProjectsInfo(adminAddress string, title string) (ProjectInfo, error) {
 	parsedJson, parseErr := parser.Parse(string(content))
 
 	if parseErr != nil {
+		logger.Errorf("gitcoin parse json error: [%v]", parseErr)
+
 		return project, parseErr
 	}
 
@@ -167,6 +171,8 @@ func (gc *crawler) GetZkSyncDonations(fromBlock, toBlock int64) ([]DonationInfo,
 	for i := fromBlock; i <= toBlock; i++ {
 		trxs, err := zksync.GetTxsByBlock(i)
 		if err != nil {
+			logger.Errorf("get txs by block error: [%v]", err)
+
 			return nil, err
 		}
 
@@ -191,7 +197,7 @@ func (gc *crawler) GetZkSyncDonations(fromBlock, toBlock int64) ([]DonationInfo,
 			if gc.needUpdateProject(adminAddress) {
 				inactive, err = gc.updateHostingProject(adminAddress)
 				if err != nil {
-					logger.Error(err)
+					logger.Errorf("updateHostingProject error: [%v]", err)
 				}
 			}
 
@@ -236,6 +242,8 @@ func GetEthDonations(fromBlock int64, toBlock int64, chainType ChainType) ([]Don
 	logs, err := moralis.GetLogs(fromBlock, toBlock, checkoutAddress, donationSentTopic, string(chainType), config.Config.Indexer.Moralis.ApiKey)
 
 	if err != nil {
+		logger.Errorf("getLogs error: [%v]", err)
+
 		return nil, err
 	}
 
