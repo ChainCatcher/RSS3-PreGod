@@ -47,17 +47,17 @@ func (ar *crawler) run() error {
 	endBlockHeight := startBlockHeight + step
 	tempDelay := ar.cfg.sleepInterval
 
+	latestConfirmedBlockHeight, err := GetLatestBlockHeightWithConfirmations(ar.cfg.confirmations)
+	if err != nil {
+		logger.Errorf("get latest block error: %v", err)
+
+		return err
+	}
+
 	for {
 		// handle interrupt
 		if ar.gotInterrupt() {
 			return ErrInterrupt
-		}
-
-		latestConfirmedBlockHeight, err := GetLatestBlockHeightWithConfirmations(ar.cfg.confirmations)
-		if err != nil {
-			logger.Errorf("get latest block error: %v", err)
-
-			return err
 		}
 
 		if latestConfirmedBlockHeight <= endBlockHeight {
