@@ -31,7 +31,8 @@ metadata:
 spec:
   rateLimit:
     period: 1m
-    average: 600
+    average: 200
+    burst: 200
     sourceCriterion:
       ipStrategy:
         depth: 2

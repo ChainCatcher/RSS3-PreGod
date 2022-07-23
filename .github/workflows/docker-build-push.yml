@@ -10,9 +10,11 @@ on:
 
 
 env:
-  AWS_REGION: us-west-2
   IMAGE_NAME_HUB: rss3/pregod-hub
   IMAGE_NAME_INDEXER: rss3/pregod-indexer
+  REGION_ID: us-east-1
+  DEV_ACK_CLUSTER_ID: cd1d0ffc40b5242b39ddda1864e71e30d
+  PROD_ACK_CLUSTER_ID: cfc647c22fd6848b5a602ad4d7470632b
 
 jobs:
   build-hub:
@@ -106,12 +108,12 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: ${{ env.IMAGE_NAME_HUB }}
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Set K8s context
+        uses: aliyun/ack-set-context@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          access-key-id: "${{ secrets.ACCESS_KEY_ID }}"
+          access-key-secret: "${{ secrets.ACCESS_KEY_SECRET }}"
+          cluster-id: "${{ env.DEV_ACK_CLUSTER_ID }}"
       - name: Replace image field
         uses: mikefarah/yq@master
         with:
@@ -123,8 +125,7 @@ jobs:
             sed -i 's/NOLIMITHEADER/${{ secrets.NOLIMITHEADER }}/g' ./deploy/dev/route.yaml
             sed -i 's/NOLIMITVALUE/${{ secrets.NOLIMITVALUE}}/g' ./deploy/dev/route.yaml
       - run: |
-          aws eks update-kubeconfig --region us-west-2 --name development
-          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.21.5/bin/linux/amd64/kubectl && chmod +x kubectl && mv kubectl /usr/local/bin/kubectl
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.22.10/bin/linux/amd64/kubectl && chmod +x kubectl && mv kubectl /usr/local/bin/kubectl
       - run: |
           kubectl apply -f deploy/dev
           kubectl -n pregod rollout restart deploy pregod-hub pregod-indexer pregod-indexer-autocrawler
@@ -143,12 +144,12 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: ${{ env.IMAGE_NAME_HUB }}
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Set K8s context
+        uses: aliyun/ack-set-context@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          access-key-id: "${{ secrets.ACCESS_KEY_ID }}"
+          access-key-secret: "${{ secrets.ACCESS_KEY_SECRET }}"
+          cluster-id: "${{ env.PROD_ACK_CLUSTER_ID }}"
       - name: Replace image field
         uses: mikefarah/yq@master
         with:
@@ -160,8 +161,7 @@ jobs:
             sed -i 's/NOLIMITHEADER/${{ secrets.NOLIMITHEADER }}/g' ./deploy/prod/route.yaml
             sed -i 's/NOLIMITVALUE/${{ secrets.NOLIMITVALUE}}/g' ./deploy/prod/route.yaml
       - run: |
-          aws eks update-kubeconfig --region us-west-2 --name production
-          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.21.5/bin/linux/amd64/kubectl && chmod +x kubectl && mv kubectl /usr/local/bin/kubectl
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.22.10/bin/linux/amd64/kubectl && chmod +x kubectl && mv kubectl /usr/local/bin/kubectl
       - run: |
           kubectl apply -f deploy/prod
           kubectl -n pregod rollout status deploy pregod-hub
